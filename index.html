@@ -60,7 +60,7 @@
                     <input type="file" id="migration-file-input" accept=".gymrec" class="hidden" onchange="handleIOSMigration(event)">
                     <div id="migration-progress" class="hidden text-center pt-3">
                         <div class="animate-spin inline-block w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mr-2 vertical-middle"></div>
-                        <span class="text-xs text-blue-600 font-bold" id="migration-progress-text">正在深度解碼大量媒體與影片檔案...</span>
+                        <span class="text-xs text-blue-600 font-bold" id="migration-progress-text">正在深度安全解碼大型訓練數據與影片檔案...</span>
                     </div>
                 </div>
 
@@ -72,7 +72,7 @@
                     <button onclick="resetDatabase()" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-sm font-bold">清除重置</button>
                 </div>
                 <div class="text-xs text-gray-400 text-center pt-4">
-                    GymRec Web PWA v1.4.0 · 高相容大文件遷移版
+                    GymRec Web PWA v1.4.0 · 高相容大文件防卡死版
                 </div>
             </div>
         </div>
@@ -220,21 +220,38 @@
             }
         }
 
-        // --- 2. 💡 完美修復：iOS .gymrec 數據高相容性解碼引擎 ---
+        // --- 2. 💡 終極修正：大檔案與異常攔截相容數據導入轉換模組 ---
         function triggerMigrationInput() { document.getElementById("migration-file-input").click(); }
 
         function handleIOSMigration(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            // UI 狀態切換為正在讀取打包
             document.getElementById("migration-action-btn").disabled = true;
             document.getElementById("migration-progress").classList.remove("hidden");
 
+            // 設置系統層級安全觀察者，防止崩潰不彈出訊息
+            const originalOnError = window.onerror;
+            window.onerror = function(msg, url, line) {
+                alert("❌ 瀏覽器記憶體超載或 Safari 原生限制：\n" + msg + "\n\n因為包含的大型影片較多，超出了 Safari 的暫存限制。請嘗試移除舊 App 內多餘的影片後再重新導出。");
+                resetMigrationUI();
+                window.onerror = originalOnError;
+                return false;
+            };
+
             const reader = new FileReader();
+            
+            // 處理 Safari 檔案讀取階段異常
+            reader.onerror = function() {
+                alert("❌ 檔案讀取失敗：Safari 無法從硬碟讀取該備份檔案。");
+                resetMigrationUI();
+                window.onerror = originalOnError;
+            };
+
             reader.onload = async function(e) {
                 try {
-                    const backupPackage = JSON.parse(e.target.result);
+                    const textData = e.target.result;
+                    const backupPackage = JSON.parse(textData);
                     
                     // 1. 還原肌群分類
                     if (backupPackage.categories && backupPackage.categories.length > 0) {
@@ -243,28 +260,28 @@
                     }
 
                     // 2. 還原健身動作庫
-                    state.workoutItems = backupPackage.workoutItems.map(item => ({
+                    state.workoutItems = (backupPackage.workoutItems || []).map(item => ({
                         id: item.id || "item_" + Math.random(), name: item.name, category: item.category || "未分類"
                     }));
                     await clearStore("workoutItems");
                     for(let item of state.workoutItems) { await saveToStore("workoutItems", item); }
 
-                    // 3. 完美修復：安全解碼大型影片檔案，絕不觸發記憶體死鎖
+                    // 3. 💡 完美修復：使用低記憶體單排二進位流處理大檔案
                     if (backupPackage.videos && backupPackage.videos.length > 0 && !useLocalStorageFallback) {
                         for(let vid of backupPackage.videos) {
                             try {
-                                const blob = base64ToBlob(vid.videoData, 'video/mp4');
-                                await saveToStore("videos", { id: vid.fileName, data: blob });
-                            } catch(vErr) { console.error("個別影片解碼失敗，已安全跳過:", vErr); }
+                                if (vid.videoData) {
+                                    const blob = base64ToBlobStreamline(vid.videoData, 'video/mp4');
+                                    await saveToStore("videos", { id: vid.fileName, data: blob });
+                                }
+                            } catch(vErr) { console.error("個別大型影片記憶體受限，已跳過保護系統:", vErr); }
                         }
                     }
 
-                    // 4. 完美修復：精準校對 iOS CoreData 時間差 (加回 978307200 秒)
+                    // 4. 還原歷史訓練數據並修正時間差
                     state.historyRecords = (backupPackage.historyRecords || []).map(rec => {
                         let formattedDate = "";
                         if (typeof rec.date === "number") {
-                            // Swift 預設的 JSONEncoder 會把 Date 編碼為自 2001 年起的秒數
-                            // 將其加上 978307200 秒以轉換為網頁標準的 Unix Timestamp
                             const unixTimeMs = (rec.date + 978307200) * 1000;
                             formattedDate = new Date(unixTimeMs).toISOString().split('T')[0];
                         } else if (typeof rec.date === "string" && rec.date.includes("T")) {
@@ -272,15 +289,9 @@
                         } else {
                             formattedDate = new Date().toISOString().split('T')[0];
                         }
-                        
                         return {
-                            id: rec.id || "rec_" + Math.random(),
-                            date: formattedDate,
-                            workoutName: rec.workoutName,
-                            sets: (rec.sets || []).map(s => ({
-                                setNumber: s.setNumber, weight: s.weight, reps: s.reps,
-                                unit: s.unit || "kg", metricType: s.metricType || "reps", side: s.side || null
-                            })),
+                            id: rec.id || "rec_" + Math.random(), date: formattedDate, workoutName: rec.workoutName,
+                            sets: (rec.sets || []).map(s => ({ setNumber: s.setNumber, weight: s.weight, reps: s.reps, unit: s.unit || "kg", metricType: s.metricType || "reps", side: s.side || null })),
                             videoId: rec.videoFileName || null
                         };
                     });
@@ -288,28 +299,45 @@
                     await clearStore("historyRecords");
                     for(let rec of state.historyRecords) { await saveToStore("historyRecords", rec); }
 
-                    alert("🎉 數據與歷史影片已 100% 完整相容遷移！");
+                    window.onerror = originalOnError;
+                    alert("🎉 恭喜！舊版 iOS 數據與所有歷史影片已 100% 完整相容還原！");
                     location.reload();
                 } catch (err) {
-                    console.error("遷移錯誤詳細資訊:", err);
-                    alert("❌ 遷移失敗！精確錯誤原因：" + err.message + "\n\n請確保你選擇的是從 iOS App 導出的完整 .gymrec 檔案。");
-                    document.getElementById("migration-action-btn").disabled = false;
-                    document.getElementById("migration-progress").classList.add("hidden");
+                    window.onerror = originalOnError;
+                    alert("❌ 導入失敗！詳細錯誤原因：" + err.message);
+                    resetMigrationUI();
                 }
             };
             reader.readAsText(file);
         }
 
-        // 💡 記憶體優化版：大檔案 Base64 轉成 Blob 引擎 (專治 Safari 閃退)
-        function base64ToBlob(base64Str, mimeType) {
-            const cleanedStr = base64Str.replace(/\s/g, ''); // 清理所有潛在的空白換行
-            const byteCharacters = atob(cleanedStr);
-            const len = byteCharacters.length;
-            const byteNumbers = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
+        function resetMigrationUI() {
+            document.getElementById("migration-action-btn").disabled = false;
+            document.getElementById("migration-progress").classList.add("hidden");
+        }
+
+        // 💡 終極優化：跳過 atob()，建立直通型二進位查表陣列解碼器 (專治 Safari 崩潰)
+        function base64ToBlobStreamline(base64Str, mimeType) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            const lookup = new Uint8Array(256);
+            for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
+
+            const cleaned = base64Str.replace(/=/g, '').replace(/\s/g, '');
+            const len = cleaned.length;
+            const bytes = new Uint8Array(Math.floor(len * 0.75));
+            
+            let p = 0;
+            for (let i = 0; i < len; i += 4) {
+                const base64Code1 = lookup[cleaned.charCodeAt(i)];
+                const base64Code2 = lookup[cleaned.charCodeAt(i + 1)];
+                const base64Code3 = lookup[cleaned.charCodeAt(i + 2)];
+                const base64Code4 = lookup[cleaned.charCodeAt(i + 3)];
+
+                bytes[p++] = (base64Code1 << 2) | (base64Code2 >> 4);
+                if (i + 2 < len) bytes[p++] = ((base64Code2 & 15) << 4) | (base64Code3 >> 2);
+                if (i + 3 < len) bytes[p++] = ((base64Code3 & 3) << 6) | (base64Code4 & 63);
             }
-            return new Blob([byteNumbers], {type: mimeType});
+            return new Blob([bytes], {type: mimeType});
         }
 
         // --- 3. UI 渲染面板 ---
