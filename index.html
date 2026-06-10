@@ -13,77 +13,44 @@
         body {
             -webkit-tap-highlight-color: transparent;
             user-select: none;
-            padding-top: env(safe-area-inset-top);
         }
         .safe-bottom {
-            padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+            padding-bottom: calc(env(safe-area-inset-bottom) + 4rem);
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-900 font-sans antialiased pb-24">
+<body class="bg-gray-100 text-gray-900 font-sans antialiased pb-20">
 
-    <div class="bg-blue-600 text-white pt-6 pb-4 px-4 sticky top-0 z-40 shadow-md flex justify-between items-center">
-        <h1 class="text-lg font-black tracking-wide" id="page-title">🏋️ GymRec 開始訓練</h1>
+    <div class="bg-blue-600 text-white pt-12 pb-4 px-4 sticky top-0 z-50 shadow-md flex justify-between items-center">
+        <h1 class="text-xl font-black tracking-wide" id="page-title">🏋️ GymRec 開始訓練</h1>
         <button id="global-add-btn" class="text-white focus:outline-none" onclick="openAddModal()">
-            <i data-lucide="plus-circle" class="w-6 h-6"></i>
+            <i data-lucide="plus-circle" class="w-7 h-7"></i>
         </button>
     </div>
 
     <main class="p-4 safe-bottom">
-        
         <div id="tab-workout" class="tab-content">
-            <div id="category-list" class="space-y-3">
-                </div>
+            <div id="category-list" class="space-y-4">
+                <p class="text-center text-sm text-gray-400 py-8">正在初始化健身資料庫...</p>
+            </div>
         </div>
 
-        <div id="tab-history" class="tab-content hidden space-y-4">
-            <div class="bg-white p-4 rounded-2xl shadow-xs space-y-3">
-                <div class="flex justify-between items-center border-b pb-2">
-                    <div class="flex items-center gap-1.5 font-bold text-sm text-gray-700">
-                        <i data-lucide="trending-up" class="w-4 h-4 text-blue-500"></i>顯示分析圖表
+        <div id="tab-history" class="tab-content hidden">
+            <div class="bg-white p-4 rounded-2xl shadow-sm mb-4">
+                <h3 class="font-bold text-sm text-gray-500 mb-2">📅 歷史訓練紀錄清單</h3>
+                <div id="history-logs-container" class="space-y-3">
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="toggle-global-charts" checked onchange="toggleGlobalChartsView()" class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                </div>
-                
-                <div id="global-chart-filters" class="space-y-2">
-                    <div class="grid grid-cols-3 gap-1.5 bg-gray-100 p-1 rounded-xl">
-                        <button onclick="setHistoryUnit('days')" id="unit-days" class="py-1.5 text-xs font-bold rounded-lg text-gray-500">天</button>
-                        <button onclick="setHistoryUnit('weeks')" id="unit-weeks" class="py-1.5 text-xs font-bold rounded-lg bg-white text-blue-600 shadow-xs">週</button>
-                        <button onclick="setHistoryUnit('months')" id="unit-months" class="py-1.5 text-xs font-bold rounded-lg text-gray-500">月</button>
-                    </div>
-                    <div class="flex justify-between items-center text-xs text-gray-500 px-1">
-                        <div class="flex items-center gap-1">
-                            <span>從</span>
-                            <select id="filter-start-range" onchange="renderGlobalHistory()" class="bg-gray-50 border-0 rounded-md p-1 font-bold text-gray-700"></select>
-                            <span id="lbl-unit-start">週前</span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            <span>到</span>
-                            <select id="filter-end-range" onchange="renderGlobalHistory()" class="bg-gray-50 border-0 rounded-md p-1 font-bold text-gray-700"></select>
-                            <span id="lbl-unit-end">週前</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="global-charts-wrapper" class="space-y-4"></div>
-
-            <div class="bg-white p-4 rounded-2xl shadow-xs">
-                <h3 class="font-black text-xs text-gray-400 tracking-wider mb-3">📅 所有歷史訓練紀錄清單</h3>
-                <div id="history-logs-container" class="space-y-3"></div>
             </div>
         </div>
 
         <div id="tab-settings" class="tab-content hidden">
-            <div class="bg-white p-4 rounded-2xl shadow-xs space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm space-y-4">
+                
                 <div class="border-b pb-4">
-                    <p class="font-extrabold text-blue-600 flex items-center gap-1.5">
+                    <p class="font-bold text-blue-600 flex items-center gap-1">
                         <i data-lucide="refresh-cw" class="w-4 h-4"></i>從舊版 iOS App 遷移數據
                     </p>
-                    <p class="text-xs text-gray-400 mt-1 mb-3">選擇你在 iPhone App 導出的 .gymrec 檔案，一鍵無痛將歷史紀錄與大體積影片安全灌入網頁版</p>
+                    <p class="text-xs text-gray-400 mt-1 mb-3">選擇你在 iPhone App 導出的 .gymrec 檔案，一鍵還原所有紀錄與影片</p>
                     <button onclick="triggerMigrationInput()" class="w-full bg-blue-50 text-blue-600 py-3 rounded-xl text-sm font-bold border border-blue-200 active:bg-blue-100">
                         選擇 .gymrec 備份檔案導入
                     </button>
@@ -92,31 +59,20 @@
 
                 <div class="flex justify-between items-center border-b pb-2">
                     <div>
-                        <p class="font-bold text-sm">數據防丟統計</p>
-                        <p class="text-xs text-gray-400">目前本地資料庫承載量</p>
+                        <p class="font-bold">本地數據清除</p>
+                        <p class="text-xs text-gray-400">重置 App 到初始狀態</p>
                     </div>
-                    <div class="text-right text-xs font-mono font-bold text-gray-500 space-y-0.5">
-                        <div id="stat-cats">肌群：0 個</div>
-                        <div id="stat-items">動作：0 個</div>
-                        <div id="stat-recs">紀錄：0 筆</div>
-                    </div>
+                    <button onclick="resetDatabase()" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-sm font-bold">清除重置</button>
                 </div>
-
-                <div class="flex justify-between items-center pt-2">
-                    <div>
-                        <p class="font-bold text-sm text-red-600">本地數據清除</p>
-                        <p class="text-xs text-gray-400">重置瀏覽器沙盒，徹底抹除紀錄</p>
-                    </div>
-                    <button onclick="resetDatabase()" class="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold border border-red-100">清除重置</button>
-                </div>
-                <div class="text-[10px] text-gray-400 text-center pt-8">
-                    GymRec Web PWA v1.5.0 · 免簽永不過期完全體
+                <div class="text-xs text-gray-400 text-center pt-4">
+                    GymRec Web PWA v1.2.0 · Safari 終極相容修正版
                 </div>
             </div>
         </div>
     </main>
 
-    <div id="detail-page" class="fixed inset-0 bg-gray-50 z-50 transform translate-x-full transition-transform duration-300 overflow-y-auto hidden"></div>
+    <div id="detail-page" class="fixed inset-0 bg-gray-50 z-50 transform translate-x-full transition-transform duration-300 overflow-y-auto hidden">
+        </div>
 
     <div id="record-modal" class="fixed inset-0 bg-black/50 z-50 flex items-end justify-center hidden">
         <div class="bg-white w-full max-w-md rounded-t-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -126,447 +82,46 @@
             </div>
             <div class="space-y-2">
                 <label class="text-xs font-bold text-gray-400">訓練日期</label>
-                <input type="date" id="record-date" class="w-full bg-gray-100 p-3 rounded-xl border-0 focus:ring-2 focus:ring-blue-500 font-bold">
+                <input type="date" id="record-date" class="w-full bg-gray-100 p-3 rounded-xl border-0 focus:ring-2 focus:ring-blue-500">
             </div>
             <div class="space-y-2">
-                <label class="text-xs font-bold text-gray-400">上傳本次動作影片 (本地沙盒儲存)</label>
-                <input type="file" id="record-video-input" accept="video/*" class="w-full text-xs text-gray-500">
+                <label class="text-xs font-bold text-gray-400">動作影片 (本地儲存)</label>
+                <input type="file" id="record-video-input" accept="video/*" class="w-full text-sm text-gray-500">
             </div>
             <div class="space-y-3">
                 <div class="flex justify-between items-center">
-                    <label class="text-xs font-bold text-gray-400">組數紀錄</label>
-                    <button onclick="addNewSetRow()" class="text-blue-600 text-xs font-black flex items-center gap-0.5">
-                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>新增一組
+                    <label class="text-xs font-bold text-gray-400">組數紀錄 (點擊重量切換 N/A)</label>
+                    <button onclick="addNewSetRow()" class="text-blue-600 text-xs font-bold flex items-center gap-1">
+                        <i data-lucide="plus" class="w-3 h-3"></i>新增一組
                     </button>
                 </div>
-                <div id="sets-input-container" class="space-y-2.5"></div>
+                <div id="sets-input-container" class="space-y-2">
+                    </div>
             </div>
-            <button onclick="saveRecordFromModal()" class="w-full bg-green-500 text-white py-3.5 rounded-xl font-bold shadow-md active:bg-green-600 transition-colors">儲存紀錄</button>
+            <button onclick="saveRecordFromModal()" class="w-full bg-green-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-200">儲存紀錄</button>
         </div>
     </div>
 
     <div id="add-item-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4 shadow-xl">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 space-y-4">
             <h3 class="text-lg font-black">新增訓練項目</h3>
-            <div class="space-y-1">
-                <label class="text-xs font-bold text-gray-400">動作名稱</label>
-                <input type="text" id="new-item-name" placeholder="如：槓鈴臥推" class="w-full bg-gray-100 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold">
-            </div>
-            <div class="space-y-1">
-                <label class="text-xs font-bold text-gray-400">分配肌群區域</label>
-                <select id="new-item-cat" class="w-full bg-gray-100 p-3 rounded-xl font-bold border-0 focus:ring-2 focus:ring-blue-500"></select>
-            </div>
-            <div class="flex gap-2.5 pt-2">
-                <button onclick="closeAddModal()" class="w-1/2 bg-gray-100 text-gray-500 py-3 rounded-xl font-bold active:bg-gray-200">取消</button>
-                <button onclick="submitNewItem()" class="w-1/2 bg-blue-600 text-white py-3 rounded-xl font-bold active:bg-blue-700">確定新增</button>
+            <input type="text" id="new-item-name" placeholder="輸入動作名稱 (如：槓鈴臥推)" class="w-full bg-gray-100 p-3 rounded-xl">
+            <select id="new-item-cat" class="w-full bg-gray-100 p-3 rounded-xl">
+                </select>
+            <div class="flex gap-2">
+                <button onclick="closeAddModal()" class="w-1/2 bg-gray-200 py-3 rounded-xl font-bold">取消</button>
+                <button onclick="submitNewItem()" class="w-1/2 bg-blue-600 text-white py-3 rounded-xl font-bold">新增</button>
             </div>
         </div>
     </div>
 
     <div id="video-player-overlay" class="fixed inset-0 bg-black z-50 flex items-center justify-center hidden" onclick="closeFullScreenVideo()">
         <button class="absolute top-12 left-6 text-white/80 z-50"><i data-lucide="x-circle" class="w-8 h-8"></i></button>
-        <video id="global-video-player" controls playsinline class="w-full max-h-screen"></video>
+        <video id="global-video-player" controls class="w-full max-h-screen"></video>
     </div>
 
-    <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-around py-2 shadow-xl z-30">
-        <button onclick="switchTab('workout')" id="tab-btn-workout" class="flex flex-col items-center gap-0.5 text-blue-600 transition-colors">
-            <i data-lucide="dumbbell" class="w-5.5 h-5.5"></i><span class="text-[10px] font-black">開始訓練</span>
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-around py-2 shadow-lg z-40">
+        <button onclick="switchTab('workout')" id="tab-btn-workout" class="flex flex-col items-center gap-0.5 text-blue-600">
+            <i data-lucide="dumbbell" class="w-6 h-6"></i><span class="text-[10px] font-bold">開始訓練</span>
         </button>
-        <button onclick="switchTab('history')" id="tab-btn-history" class="flex flex-col items-center gap-0.5 text-gray-400 transition-colors">
-            <i data-lucide="calendar" class="w-5.5 h-5.5"></i><span class="text-[10px] font-black">歷史總覽</span>
-        </button>
-        <button onclick="switchTab('settings')" id="tab-btn-settings" class="flex flex-col items-center gap-0.5 text-gray-400 transition-colors">
-            <i data-lucide="settings" class="w-5.5 h-5.5"></i><span class="text-[10px] font-black">系統設定</span>
-        </button>
-    </nav>
-
-    <script>
-        let db;
-        let globalHistoryChartInstances = {}; // 追蹤所有 Chart 實例防止內存洩漏
-        let state = { workoutItems: [], historyRecords: [], categories: [], expandedGroups: new Set(), currentDetailItem: null, currentHistoryUnit: 'weeks' };
-        
-        const rangeOptions = [0, 1, 2, 3, 4, 6, 8, 12, 24, 30];
-
-        // 1. IndexedDB 電影級別高負載儲存庫初始化
-        const request = indexedDB.open("GymRecWebUltimateDB", 2);
-        request.onupgradeneeded = function(e) {
-            let dbInst = e.target.result;
-            if(!dbInst.objectStoreNames.contains("workoutItems")) dbInst.createObjectStore("workoutItems", {keyPath: "id"});
-            if(!dbInst.objectStoreNames.contains("historyRecords")) dbInst.createObjectStore("historyRecords", {keyPath: "id"});
-            if(!dbInst.objectStoreNames.contains("categories")) dbInst.createObjectStore("categories", {autoIncrement: true});
-            if(!dbInst.objectStoreNames.contains("videos")) dbInst.createObjectStore("videos", {keyPath: "id"});
-        };
-        request.onsuccess = function(e) {
-            db = e.target.result;
-            initAppDatabase();
-        };
-
-        async function initAppDatabase() {
-            state.categories = await getAllFromStore("categories");
-            if (state.categories.length === 0) {
-                state.categories = ["胸部 (Chest)", "背部 (Back)", "上肢 (Upper Limbs)", "下肢 (Lower Limbs)", "核心 (Core)"];
-                for(let cat of state.categories) { await addToStore("categories", cat); }
-            }
-            state.workoutItems = await getAllFromStore("workoutItems");
-            if (state.workoutItems.length === 0) {
-                const defaultItems = [
-                    { id: "1", name: "槓鈴臥推", category: "胸部 (Chest)" },
-                    { id: "2", name: "單手啞鈴划船", category: "背部 (Back)" },
-                    { id: "3", name: "棒式支撐", category: "核心 (Core)" },
-                    { id: "4", name: "保加利亞分腿蹲", category: "下肢 (Lower Limbs)" }
-                ];
-                for(let item of defaultItems) { await saveToStore("workoutItems", item); }
-                state.workoutItems = defaultItems;
-            }
-            state.historyRecords = await getAllFromStore("historyRecords");
-            
-            buildRangeSelectors();
-            renderCategoryList();
-            updateStatsView();
-            lucide.createIcons();
-        }
-
-        // 2. UI 動態渲染器 - 完美移植手風琴收合 (初始僅顯示分類標題)
-        function renderCategoryList() {
-            const container = document.getElementById("category-list");
-            container.innerHTML = "";
-
-            state.categories.forEach(cat => {
-                const items = state.workoutItems.filter(i => i.category === cat);
-                const isExpanded = state.expandedGroups.has(cat);
-
-                let html = `
-                    <div class="bg-white rounded-2xl shadow-xs overflow-hidden border border-gray-100 transition-all">
-                        <div onclick="toggleGroupAccordion('${cat}')" class="p-4 flex justify-between items-center bg-white active:bg-gray-50 cursor-pointer select-none">
-                            <span class="font-black text-sm text-gray-800 tracking-wide">${cat}</span>
-                            <i data-lucide="${isExpanded ? 'chevron-down' : 'chevron-right'}" class="w-4 h-4 text-blue-500"></i>
-                        </div>
-                        <div class="${isExpanded ? '' : 'hidden'} border-t border-gray-50 bg-gray-50/50 p-2 space-y-1">
-                `;
-
-                if (items.length === 0) {
-                    html += `<p class="text-xs text-gray-400 italic p-3 text-center">該分區尚無動作項目</p>`;
-                } else {
-                    items.forEach(item => {
-                        html += `
-                            <div onclick="openDetailPage('${item.id}')" class="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-100 active:scale-[0.99] transition-transform cursor-pointer mb-1 shadow-2xs">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                                    <span class="text-xs font-extrabold text-gray-700">${item.name}</span>
-                                </div>
-                                <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-gray-300"></i>
-                            </div>
-                        `;
-                    });
-                }
-                html += `</div></div>`;
-                container.insertAdjacentHTML('beforeend', html);
-            });
-            lucide.createIcons();
-        }
-
-        function toggleGroupAccordion(cat) {
-            if (state.expandedGroups.has(cat)) state.expandedGroups.delete(cat);
-            else state.expandedGroups.add(cat);
-            renderCategoryList();
-        }
-
-        // 3. 智慧圖表過濾與多圖分流引擎 (TAB 2 核心)
-        function buildRangeSelectors() {
-            const startSel = document.getElementById("filter-start-range");
-            const endSel = document.getElementById("filter-end-range");
-            
-            startSel.innerHTML = rangeOptions.filter(v => v > 0).map(v => `<option value="${v}" ${v===4?'selected':''}>${v}</option>`).join('');
-            endSel.innerHTML = rangeOptions.map(v => `<option value="${v}" ${v===0?'selected':''}>${v===0?'今天':v}</option>`).join('');
-        }
-
-        function setHistoryUnit(unit) {
-            state.currentHistoryUnit = unit;
-            document.querySelectorAll("#global-chart-filters button").forEach(b => b.className = "py-1.5 text-xs font-bold rounded-lg text-gray-500");
-            document.getElementById(`unit-${unit}`).className = "py-1.5 text-xs font-bold rounded-lg bg-white text-blue-600 shadow-xs";
-            
-            const unitLabel = unit === 'days' ? '天前' : (unit === 'weeks' ? '週前' : '月前');
-            document.getElementById("lbl-unit-start").innerText = unitLabel;
-            document.getElementById("lbl-unit-end").innerText = unitLabel;
-            renderGlobalHistory();
-        }
-
-        function toggleGlobalChartsView() {
-            const wrapper = document.getElementById("global-charts-wrapper");
-            const filters = document.getElementById("global-chart-filters");
-            if (document.getElementById("toggle-global-charts").checked) {
-                wrapper.classList.remove("hidden");
-                filters.classList.remove("hidden");
-                renderGlobalHistory();
-            } else {
-                wrapper.classList.add("hidden");
-                filters.classList.add("hidden");
-            }
-        }
-
-        function renderGlobalHistory() {
-            // A. 渲染文字紀錄清單
-            const logsContainer = document.getElementById("history-logs-container");
-            logsContainer.innerHTML = "";
-            const sortedRecords = [...state.historyRecords].sort((a,b) => new Date(b.date) - new Date(a.date));
-
-            if(sortedRecords.length === 0) {
-                logsContainer.innerHTML = `<p class="text-xs text-gray-400 italic text-center py-4">目前尚無任何訓練紀錄</p>`;
-            } else {
-                sortedRecords.forEach(rec => {
-                    let setStr = "";
-                    rec.sets.forEach(s => {
-                        let w = s.weight === null ? "N/A" : `${s.weight}${s.unit}`;
-                        let side = s.side ? `[${s.side}]` : "";
-                        setStr += `${side}${w}×${s.reps}${s.metricType==='mins'?'分':'下'} | `;
-                    });
-                    logsContainer.insertAdjacentHTML('beforeend', `
-                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-xs">
-                            <div class="flex justify-between font-black text-gray-700 mb-1">
-                                <span>${rec.workoutName}</span><span class="text-gray-400 font-medium">${rec.date}</span>
-                            </div>
-                            <p class="text-gray-500 font-mono text-[11px]">${setStr.slice(0, -3)}</p>
-                        </div>
-                    `);
-                });
-            }
-
-            // B. 智慧型多圖表分流繪製
-            const chartsWrapper = document.getElementById("global-charts-wrapper");
-            // 清理舊圖表防止記憶體洩漏
-            Object.values(globalHistoryChartInstances).forEach(chart => chart.destroy());
-            globalHistoryChartInstances = {};
-            chartsWrapper.innerHTML = "";
-
-            if (!document.getElementById("toggle-global-charts").checked || state.historyRecords.length === 0) return;
-
-            // 時間區間過濾算法
-            const startRange = parseInt(document.getElementById("filter-start-range").value);
-            const endRange = parseInt(document.getElementById("filter-end-range").value);
-            
-            const today = new Date();
-            let startDate = new Date();
-            let endDate = new Date();
-            
-            if(state.currentHistoryUnit === 'days') {
-                startDate.setDate(today.getDate() - startRange);
-                endDate.setDate(today.getDate() - endRange);
-            } else if(state.currentHistoryUnit === 'weeks') {
-                startDate.setDate(today.getDate() - (startRange * 7));
-                endDate.setDate(today.getDate() - (endRange * 7));
-            } else {
-                startDate.setMonth(today.getMonth() - startRange);
-                endDate.setMonth(today.getMonth() - endRange);
-            }
-            
-            // 強制時間格式歸零對齊
-            startDate.setHours(0,0,0,0);
-            endDate.setHours(23,59,59,999);
-
-            const filtered = state.historyRecords.filter(r => {
-                const d = new Date(r.date);
-                return d >= startDate && d <= endDate;
-            });
-
-            // 依動作名稱分流群組
-            const grouped = {};
-            filtered.forEach(r => {
-                if(!grouped[r.workoutName]) grouped[r.workoutName] = [];
-                grouped[r.workoutName].push(r);
-            });
-
-            // 遍歷每個動作，動態生成專屬 Canvas 折線圖卡
-            Object.keys(grouped).sort().forEach(workoutName => {
-                const workoutRecords = grouped[workoutName].sort((a,b) => new Date(a.date) - new Date(b.date));
-                const canvasId = `chart-${hashString(workoutName)}`;
-                
-                chartsWrapper.insertAdjacentHTML('beforeend', `
-                    <div class="bg-white p-4 rounded-2xl shadow-xs border border-gray-50">
-                        <h4 class="text-xs font-black text-gray-700 mb-2 flex items-center gap-1">
-                            <div class="w-1 h-3 bg-blue-500 rounded-full"></div>${workoutName} 進步曲線
-                        </h4>
-                        <div class="h-40 w-full"><canvas id="${canvasId}"></canvas></div>
-                    </div>
-                `);
-
-                const ctx = document.getElementById(canvasId);
-                if(ctx) {
-                    const latestRecord = workoutRecords[workoutRecords.length - 1];
-                    const firstSet = latestRecord.sets[0];
-                    const isMins = firstSet.metricType === 'mins';
-                    const isNA = firstSet.weight === null;
-                    
-                    let yLabel = isMins ? "時間 (分)" : (isNA ? "次數 (下)" : "重量 (kg)");
-                    let labels = [], dataL = [], dataR = [], dataBoth = [];
-
-                    workoutRecords.forEach(rec => {
-                        labels.push(rec.date);
-                        let maxObj = {};
-                        rec.sets.forEach(s => {
-                            let side = s.side || "Both";
-                            let val = (isMins || isNA) ? s.reps : (s.weight || 0);
-                            if(s.unit === 'lbs' && !isMins && !isNA) val = val / 2.2046; // 對齊 KG 軸
-                            if(!maxObj[side] || val > maxObj[side]) maxObj[side] = val;
-                        });
-                        dataL.push(maxObj["L"] !== undefined ? maxObj["L"] : null);
-                        dataR.push(maxObj["R"] !== undefined ? maxObj["R"] : null);
-                        dataBoth.push(maxObj["Both"] !== undefined ? maxObj["Both"] : null);
-                    });
-
-                    globalHistoryChartInstances[canvasId] = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [
-                                { label: '左 (L)', data: dataL, borderColor: '#3b82f6', tension: 0.25, spanGaps: true, pointRadius: 2 },
-                                { label: '右 (R)', data: dataR, borderColor: '#ef4444', tension: 0.25, spanGaps: true, pointRadius: 2 },
-                                { label: '雙側', data: dataBoth, borderColor: '#10b981', tension: 0.25, spanGaps: true, pointRadius: 2 }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { labels: { boxWidth: 8, font: { size: 9 } } } },
-                            scales: { y: { title: { display: true, text: yLabel, font: { size: 9, weight: 'bold' } }, ticks: { font: { size: 8 } } }, x: { ticks: { font: { size: 8 } } } }
-                        }
-                    });
-                }
-            });
-        }
-
-        // 4. 動作詳情滑入頁面板塊
-        async function openDetailPage(itemId) {
-            const item = state.workoutItems.find(i => i.id === itemId);
-            state.currentDetailItem = item;
-            const page = document.getElementById("detail-page");
-            page.classList.remove("hidden");
-            setTimeout(() => page.classList.remove("translate-x-full"), 10);
-
-            const records = state.historyRecords.filter(r => r.workoutName === item.name).sort((a,b) => new Date(b.date) - new Date(a.date));
-
-            let listHtml = "";
-            records.forEach(rec => {
-                let setsHtml = "";
-                rec.sets.forEach(s => {
-                    let side = s.side === 'L' ? `<span class="text-blue-500 font-bold mr-1">[左]</span>` : (s.side === 'R' ? `<span class="text-red-500 font-bold mr-1">[右]</span>` : "");
-                    setsHtml += `<p class="text-xs text-gray-500">第 ${s.setNumber} 組：${side}${s.weight===null?'N/A':s.weight+' '+s.unit} × ${s.reps}${s.metricType==='mins'?'分':'下'}</p>`;
-                });
-                
-                let playBtn = rec.videoId ? `<button onclick="playLocalVideoSandbox('${rec.videoId}', event)" class="mt-2 w-full bg-gray-900 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 active:bg-black"><i data-lucide="play" class="w-3.5 h-3.5"></i>播放本次訓練影片</button>` : "";
-
-                listHtml += `
-                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 relative">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-xs font-black text-blue-600">${rec.date}</span>
-                            <button onclick="deleteSingleRecord('${rec.id}', event)" class="text-red-400 active:text-red-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                        </div>
-                        <div class="space-y-0.5">${setsHtml}</div>
-                        ${playBtn}
-                    </div>
-                `;
-            });
-
-            page.innerHTML = `
-                <div class="bg-blue-600 text-white pt-12 pb-4 px-4 sticky top-0 z-40 flex items-center gap-3 shadow-md">
-                    <button onclick="closeDetailPage()"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
-                    <h2 class="text-base font-black tracking-wide">${item.name}</h2>
-                </div>
-                <div class="p-4 space-y-4 pb-28">
-                    <button onclick="openRecordModal()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md active:bg-blue-700">+ 新增今日訓練紀錄</button>
-                    <div class="bg-white p-4 rounded-2xl shadow-xs"><canvas id="detailChart" width="400" height="180"></canvas></div>
-                    <div class="bg-white p-4 rounded-2xl shadow-xs space-y-3">
-                        <h4 class="text-xs font-black text-gray-400 tracking-wider">📅 歷史訓練紀錄 (支援點擊修改)</h4>
-                        <div class="space-y-2">${listHtml || '<p class="text-xs text-gray-400 italic text-center py-4">尚無訓練紀錄</p>'}</div>
-                    </div>
-                </div>
-            `;
-            lucide.createIcons();
-            setTimeout(() => buildDetailPageChart(records), 50);
-        }
-
-        function closeDetailPage() {
-            const page = document.getElementById("detail-page");
-            page.classList.add("translate-x-full");
-            setTimeout(() => page.classList.add("hidden"), 300);
-        }
-
-        function buildDetailPageChart(records) {
-            const canvas = document.getElementById("detailChart");
-            if (!canvas || records.length === 0) return;
-            const chronological = [...records].reverse();
-            const isMins = chronological[chronological.length-1].sets[0].metricType === 'mins';
-            const isNA = chronological[chronological.length-1].sets[0].weight === null;
-            
-            let labels = [], dataL = [], dataR = [], dataBoth = [];
-            chronological.forEach(rec => {
-                labels.push(rec.date);
-                let maxObj = {};
-                rec.sets.forEach(s => {
-                    let side = s.side || "Both";
-                    let val = (isMins || isNA) ? s.reps : (s.weight || 0);
-                    if(s.unit === 'lbs' && !isMins && !isNA) val = val / 2.2046;
-                    if(!maxObj[side] || val > maxObj[side]) maxObj[side] = val;
-                });
-                dataL.push(maxObj["L"] !== undefined ? maxObj["L"] : null);
-                dataR.push(maxObj["R"] !== undefined ? maxObj["R"] : null);
-                dataBoth.push(maxObj["Both"] !== undefined ? maxObj["Both"] : null);
-            });
-
-            new Chart(canvas, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: '左 (L)', data: dataL, borderColor: '#3b82f6', tension: 0.25, spanGaps: true },
-                        { label: '右 (R)', data: dataR, borderColor: '#ef4444', tension: 0.25, spanGaps: true },
-                        { label: '雙側', data: dataBoth, borderColor: '#10b981', tension: 0.25, spanGaps: true }
-                    ]
-                },
-                options: { plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { y: { title: { display: true, text: isMins?"時間(分)":(isNA?"次數(下)":"重量(kg)"), font: { size: 10, weight: 'bold' } } } } }
-            });
-        }
-
-        // 5. 填寫紀錄單元 (L/R 智慧雙向切換、N/A 點擊翻轉、分鐘/次數互鎖)
-        function openRecordModal() {
-            document.getElementById("record-modal").classList.remove("hidden");
-            document.getElementById("record-date").value = new Date().toISOString().split('T')[0];
-            document.getElementById("record-video-input").value = "";
-            modalSets = [{ setNumber: 1, weight: 20, reps: 12, unit: "kg", metricType: "reps", side: null }];
-            renderModalRows();
-        }
-        function closeRecordModal() { document.getElementById("record-modal").classList.add("hidden"); }
-
-        function renderModalRows() {
-            const container = document.getElementById("sets-input-container");
-            container.innerHTML = "";
-            modalSets.forEach((set, index) => {
-                let isMins = set.metricType === 'mins';
-                let row = `
-                    <div class="flex items-center gap-1.5 bg-gray-50 p-2 rounded-xl border border-gray-100 text-xs">
-                        <span class="font-bold text-gray-400 w-5">#${set.setNumber}</span>
-                        <button onclick="toggleSetSide(${index})" class="w-6 h-6 rounded-full font-black text-[10px] text-white flex items-center justify-center shrink-0 ${set.side==='L'?'bg-blue-500':set.side==='R'?'bg-red-500':'bg-gray-300'}">${set.side||'雙'}</button>
-                        
-                        <div class="flex items-center bg-white rounded-lg px-2 py-1 border flex-1 justify-between min-w-0">
-                            <span onclick="toggleWeightNA(${index})" class="font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded cursor-pointer shrink-0 select-none">${set.weight===null?'N/A':set.weight}</span>
-                            ${set.weight!==null?`<input type="number" step="0.5" value="${set.weight}" onchange="updateSetWeight(${index},this.value)" class="w-10 text-right p-0 border-0 focus:ring-0 font-mono text-xs">`:''}
-                            <button onclick="toggleSetUnit(${index})" class="text-[9px] font-black px-1 rounded text-white shrink-0 ${set.unit==='kg'?'bg-blue-500':'bg-orange-500'}">${set.unit.toUpperCase()}</button>
-                        </div>
-
-                        <div class="flex items-center bg-white rounded-lg px-2 py-1 border flex-1 justify-between min-w-0">
-                            <span class="text-[10px] text-gray-400 shrink-0">${isMins?'時間':'次數'}</span>
-                            <input type="number" value="${set.reps}" onchange="updateSetReps(${index},this.value)" class="w-8 text-center p-0 border-0 focus:ring-0 font-bold text-xs">
-                            <span class="text-[10px] text-gray-400 shrink-0">${isMins?'分':'下'}</span>
-                            <button onclick="toggleSetMetric(${index})" class="text-[9px] font-black px-1 rounded text-white shrink-0 ${isMins?'bg-purple-500':'bg-green-500'}">${isMins?'MIN':'REP'}</button>
-                        </div>
-                    </div>
-                `;
-                container.insertAdjacentHTML('beforeend', row);
-            });
-        }
-
-        function addNewSetRow() {
-            let last = modalSets[modalSets.length - 1] || { weight: 20, reps: 12, unit: "kg", metricType: "reps", side: null };
-            modalSets.push({ setNumber: modalSets.length + 1, weight: last.weight, reps: last.reps, unit: last.unit, metricType: last.metricType, side: last.side });
-            renderModalRows();
-        }
-        function toggleSetSide(i) { if(!modalSets[i].side) modalSets[i].side="L"; else if(modalSets[i].side==="L") modalSets[i].side="R"; else modalSets
+        <button onclick="switchTab('history
