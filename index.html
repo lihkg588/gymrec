@@ -31,7 +31,10 @@
     <main class="p-4 safe-bottom">
         <div id="tab-workout" class="tab-content">
             <div id="category-list" class="space-y-4">
-                <p class="text-center text-sm text-gray-400 py-8">正在初始化健身資料庫...</p>
+                <div class="text-center py-12">
+                    <div class="animate-spin inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+                    <p class="text-sm text-gray-400">正在智慧初始化安全健身資料庫...</p>
+                </div>
             </div>
         </div>
 
@@ -65,7 +68,7 @@
                     <button onclick="resetDatabase()" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-sm font-bold">清除重置</button>
                 </div>
                 <div class="text-xs text-gray-400 text-center pt-4">
-                    GymRec Web PWA v1.2.0 · Safari 終極相容修正版
+                    GymRec Web PWA v1.3.0 · 秒載入抗卡死完全體
                 </div>
             </div>
         </div>
@@ -124,4 +127,434 @@
         <button onclick="switchTab('workout')" id="tab-btn-workout" class="flex flex-col items-center gap-0.5 text-blue-600">
             <i data-lucide="dumbbell" class="w-6 h-6"></i><span class="text-[10px] font-bold">開始訓練</span>
         </button>
-        <button onclick="switchTab('history
+        <button onclick="switchTab('history')" id="tab-btn-history" class="flex flex-col items-center gap-0.5 text-gray-400">
+            <i data-lucide="calendar" class="w-6 h-6"></i><span class="text-[10px] font-bold">歷史總覽</span>
+        </button>
+        <button onclick="switchTab('settings')" id="tab-btn-settings" class="flex flex-col items-center gap-0.5 text-gray-400">
+            <i data-lucide="settings" class="w-6 h-6"></i><span class="text-[10px] font-bold">系統設定</span>
+        </button>
+    </nav>
+
+    <script>
+        let db = null;
+        let useLocalStorageFallback = false;
+        let isAppInitialized = false;
+        let state = { workoutItems: [], historyRecords: [], categories: [], expandedGroups: new Set(), currentDetailItem: null };
+
+        function safeRefreshIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        }
+
+        // 💡 看門狗機制：設定 1.2 秒安全超時。如果 iOS 資料庫不回應，強制降級 localStorage 啟動網頁
+        let dbWatchdogTimer = setTimeout(() => {
+            if (!isAppInitialized) {
+                activateFallbackMode("iOS 系統資料庫無回應，已自動切換至安全防卡死相容模式");
+            }
+        }, 1200);
+
+        // --- 1. 資料庫載入核心（升級至版本 2 徹底沖刷舊資料結構問題） ---
+        try {
+            // 升級版本號至 2
+            const request = indexedDB.open("GymRecWebDB", 2);
+            
+            request.onupgradeneeded = function(e) {
+                let dbInst = e.target.result;
+                // 確保所有表單都有被建立
+                if(!dbInst.objectStoreNames.contains("workoutItems")) dbInst.createObjectStore("workoutItems", {keyPath: "id"});
+                if(!dbInst.objectStoreNames.contains("historyRecords")) dbInst.createObjectStore("historyRecords", {keyPath: "id"});
+                if(!dbInst.objectStoreNames.contains("categories")) dbInst.createObjectStore("categories", {autoIncrement: true});
+                if(!dbInst.objectStoreNames.contains("videos")) dbInst.createObjectStore("videos", {keyPath: "id"});
+            };
+            
+            request.onsuccess = function(e) {
+                db = e.target.result;
+                if (!isAppInitialized) {
+                    clearTimeout(dbWatchdogTimer); // 資料庫順利開啟，解除警報
+                    initData();
+                }
+            };
+            
+            request.onerror = function() {
+                clearTimeout(dbWatchdogTimer);
+                activateFallbackMode("資料庫開啟失敗，切換至相容模式");
+            };
+        } catch (err) {
+            clearTimeout(dbWatchdogTimer);
+            activateFallbackMode("瀏覽器限制，切換至安全相容模式");
+        }
+
+        function activateFallbackMode(reason) {
+            if(isAppInitialized) return;
+            console.warn(reason);
+            useLocalStorageFallback = true;
+            initData();
+        }
+
+        async function initData() {
+            if(isAppInitialized) return;
+            isAppInitialized = true;
+            
+            try {
+                state.categories = await getAllFromStore("categories");
+                if (state.categories.length === 0) {
+                    state.categories = ["胸部 (Chest)", "背部 (Back)", "上肢 (Upper Limbs)", "下肢 (Lower Limbs)", "核心 (Core)"];
+                    for(let cat of state.categories) { await addToStore("categories", cat); }
+                }
+                
+                state.workoutItems = await getAllFromStore("workoutItems");
+                if (state.workoutItems.length === 0) {
+                    const defaultItems = [
+                        { id: "1", name: "槓鈴臥推", category: "胸部 (Chest)" },
+                        { id: "2", name: "單手啞鈴划船", category: "背部 (Back)" },
+                        { id: "3", name: "棒式支撐", category: "核心 (Core)" }
+                    ];
+                    for(let item of defaultItems) { await saveToStore("workoutItems", item); }
+                    state.workoutItems = defaultItems;
+                }
+                
+                state.historyRecords = await getAllFromStore("historyRecords");
+                renderCategoryList();
+                renderGlobalHistory();
+                safeRefreshIcons();
+            } catch (err) {
+                console.error("資料初始化發生錯誤:", err);
+                // 萬一非同步讀取卡死，做最後一層保險強制用 localStorage 啟動網頁
+                useLocalStorageFallback = true;
+                isAppInitialized = false;
+                initData();
+            }
+        }
+
+        // --- 2. iOS .gymrec 數據導入轉換模組 ---
+        function triggerMigrationInput() { document.getElementById("migration-file-input").click(); }
+
+        function handleIOSMigration(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const backupPackage = JSON.parse(e.target.result);
+                    if (backupPackage.categories && backupPackage.categories.length > 0) {
+                        await clearStore("categories"); state.categories = backupPackage.categories;
+                        for(let cat of state.categories) { await addToStore("categories", cat); }
+                    }
+                    state.workoutItems = backupPackage.workoutItems.map(item => ({
+                        id: item.id || "item_" + Math.random(), name: item.name, category: item.category || "未分類"
+                    }));
+                    await clearStore("workoutItems");
+                    for(let item of state.workoutItems) { await saveToStore("workoutItems", item); }
+
+                    if (backupPackage.videos && backupPackage.videos.length > 0 && !useLocalStorageFallback) {
+                        for(let vid of backupPackage.videos) {
+                            try {
+                                const blob = base64ToBlob(vid.videoData, 'video/mp4');
+                                await saveToStore("videos", { id: vid.fileName, data: blob });
+                            } catch(vErr) { console.error("影片轉碼失敗:", vErr); }
+                        }
+                    }
+                    state.historyRecords = backupPackage.historyRecords.map(rec => {
+                        let formattedDate = rec.date;
+                        if (typeof rec.date === "number") { formattedDate = new Date(rec.date * 1000).toISOString().split('T')[0]; }
+                        else if (rec.date.includes("T")) { formattedDate = rec.date.split('T')[0]; }
+                        return {
+                            id: rec.id || "rec_" + Math.random(), date: formattedDate, workoutName: rec.workoutName,
+                            sets: rec.sets.map(s => ({ setNumber: s.setNumber, weight: s.weight, reps: s.reps, unit: s.unit || "kg", metricType: s.metricType || "reps", side: s.side || null })),
+                            videoId: rec.videoFileName || null
+                        };
+                    });
+                    await clearStore("historyRecords");
+                    for(let rec of state.historyRecords) { await saveToStore("historyRecords", rec); }
+                    alert("🎉 數據已全面相容轉換！100% 網頁版還原成功！");
+                    location.reload();
+                } catch (err) { alert("❌ 遷移失敗，請確保上傳的是正確的 iOS 導出備份檔 (.gymrec)"); }
+            };
+            reader.readAsText(file);
+        }
+
+        function base64ToBlob(base64Str, mimeType) {
+            const byteCharacters = atob(base64Str); const byteArrays = [];
+            for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                const slice = byteCharacters.slice(offset, offset + 512); const byteNumbers = new Array(slice.length);
+                for (let i = 0; i < slice.length; i++) { byteNumbers[i] = slice.charCodeAt(i); }
+                byteArrays.push(new Uint8Array(byteNumbers));
+            }
+            return new Blob(byteArrays, {type: mimeType});
+        }
+
+        // --- 3. UI 渲染面板 ---
+        function renderCategoryList() {
+            const container = document.getElementById("category-list"); container.innerHTML = "";
+            state.categories.forEach(cat => {
+                const items = state.workoutItems.filter(i => i.category === cat); const isExpanded = state.expandedGroups.has(cat);
+                let sectionHtml = `
+                    <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+                        <div onclick="toggleGroup('${cat}')" class="p-4 flex justify-between items-center bg-white active:bg-gray-50 cursor-pointer">
+                            <span class="font-extrabold text-base">${cat}</span>
+                            <i data-lucide="${isExpanded ? 'chevron-down' : 'chevron-right'}" class="w-5 h-5 text-blue-500"></i>
+                        </div>
+                        <div class="${isExpanded ? '' : 'hidden'} border-t border-gray-50 bg-gray-50/50 p-2 space-y-1">
+                `;
+                if (items.length === 0) { sectionHtml += `<p class="text-xs text-gray-400 italic p-3 text-center">尚無項目，點擊右上角新增</p>`; } else {
+                    items.forEach(item => {
+                        sectionHtml += `
+                            <div onclick="openDetailPage('${item.id}')" class="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-100 active:bg-gray-50 mb-1 shadow-2xs">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                                    <span class="text-sm font-bold text-gray-800">${item.name}</span>
+                                </div>
+                                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i>
+                            </div>
+                        `;
+                    });
+                }
+                sectionHtml += `</div></div>`; container.insertAdjacentHTML('beforeend', sectionHtml);
+            });
+            safeRefreshIcons();
+        }
+
+        function toggleGroup(cat) {
+            if (state.expandedGroups.has(cat)) state.expandedGroups.delete(cat); else state.expandedGroups.add(cat);
+            renderCategoryList();
+        }
+
+        // --- 4. 歷史進步圖表模組 ---
+        let currentChartInstance = null;
+        async function openDetailPage(itemId) {
+            const item = state.workoutItems.find(i => i.id === itemId); state.currentDetailItem = item;
+            const detailPage = document.getElementById("detail-page"); detailPage.classList.remove("hidden");
+            setTimeout(() => detailPage.classList.remove("translate-x-full"), 10);
+            const records = state.historyRecords.filter(r => r.workoutName === item.name).sort((a,b) => new Date(b.date) - new Date(a.date));
+            let recordsHtml = "";
+            records.forEach(rec => {
+                let setsHtml = "";
+                rec.sets.forEach(s => {
+                    let sideStr = s.side === "L" ? `<span class="text-blue-500 text-xs font-black mr-1">[左]</span>` : (s.side === "R" ? `<span class="text-red-500 text-xs font-black mr-1">[右]</span>` : "");
+                    let metricStr = s.metricType === "mins" ? "分鐘" : "下"; let weightStr = s.weight === null ? "N/A" : `${s.weight} ${s.unit}`;
+                    setsHtml += `<p class="text-xs text-gray-500">第 ${s.setNumber} 組：${sideStr}${weightStr} × ${s.reps} ${metricStr}</p>`;
+                });
+                let videoBtn = (rec.videoId && !useLocalStorageFallback) ? `<button onclick="playVideo('${rec.videoId}', event)" class="mt-2 w-full bg-black text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1"><i data-lucide="play" class="w-3 h-3"></i>播放動作紀錄影片</button>` : "";
+                recordsHtml += `
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 relative">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-black text-blue-600">${rec.date}</span>
+                            <button onclick="deleteRecord('${rec.id}', event)" class="text-red-400 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                        ${setsHtml} ${videoBtn}
+                    </div>
+                `;
+            });
+
+            detailPage.innerHTML = `
+                <div class="bg-blue-600 text-white pt-12 pb-4 px-4 sticky top-0 z-50 flex items-center gap-2 shadow-md">
+                    <button onclick="closeDetailPage()"><i data-lucide="arrow-left" class="w-6 h-6"></i></button>
+                    <h2 class="text-lg font-black">${item.name}</h2>
+                </div>
+                <div class="p-4 space-y-4 pb-24">
+                    <button onclick="openRecordModal()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md">+ 新增今日訓練紀錄</button>
+                    <div class="bg-white p-4 rounded-2xl shadow-2xs">
+                        <h4 class="text-xs font-black text-gray-400 mb-2 tracking-wider">📈 重量/時間進步曲線</h4>
+                        <canvas id="detailChart" width="400" height="200"></canvas>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-2xs space-y-3">
+                        <h4 class="text-xs font-black text-gray-400 tracking-wider">📅 歷史紀錄清單</h4>
+                        <div class="space-y-2">${recordsHtml || '<p class="text-xs text-gray-400 italic text-center py-4">尚無訓練紀錄</p>'}</div>
+                    </div>
+                </div>
+            `;
+            safeRefreshIcons(); buildSmartChart(records);
+        }
+
+        function closeDetailPage() { const detailPage = document.getElementById("detail-page"); detailPage.classList.add("translate-x-full"); setTimeout(() => detailPage.classList.add("hidden"), 300); }
+
+        function buildSmartChart(records) {
+            if(currentChartInstance) currentChartInstance.destroy(); const ctx = document.getElementById('detailChart'); if(!ctx || records.length === 0 || !window.Chart) return;
+            const chronological = [...records].reverse(); const latestSet = records[0].sets[0]; const isMins = latestSet.metricType === "mins"; const isNA = latestSet.weight === null;
+            let yLabel = "重量 (kg)"; if(isMins) yLabel = "時間 (分)"; else if(isNA) yLabel = "次數 (下)";
+            let dataL = [], dataR = [], dataBoth = [], labels = [];
+            chronological.forEach(rec => {
+                labels.push(rec.date); let grouped = {};
+                rec.sets.forEach(s => {
+                    let side = s.side || "Both"; let val = (isMins || isNA) ? s.reps : (s.weight || 0);
+                    if(s.unit === "lbs" && !isMins && !isNA) val = val / 2.2046;
+                    if(!grouped[side] || val > grouped[side]) grouped[side] = val;
+                });
+                dataL.push(grouped["L"] !== undefined ? grouped["L"] : null); dataR.push(grouped["R"] !== undefined ? grouped["R"] : null); dataBoth.push(grouped["Both"] !== undefined ? grouped["Both"] : null);
+            });
+            currentChartInstance = new Chart(ctx, {
+                type: 'line', data: { labels: labels, datasets: [ { label: '左側 (L)', data: dataL, borderColor: '#3b82f6', tension: 0.3, spanGaps: true }, { label: '右側 (R)', data: dataR, borderColor: '#ef4444', tension: 0.3, spanGaps: true }, { label: '雙側/一般', data: dataBoth, borderColor: '#10b981', tension: 0.3, spanGaps: true } ] },
+                options: { responsive: true, plugins: { legend: { display: true, labels: { boxWidth: 12 } } }, scales: { y: { title: { display: true, text: yLabel } } } }
+            });
+        }
+
+        // --- 5. 組數表單控制單元 ---
+        let modalSets = [];
+        function openRecordModal() {
+            document.getElementById("record-modal").classList.remove("hidden"); document.getElementById("record-date").value = new Date().toISOString().split('T')[0]; document.getElementById("record-video-input").value = "";
+            modalSets = [{ setNumber: 1, weight: 10, reps: 10, unit: "kg", metricType: "reps", side: null }]; renderModalSetsRows();
+        }
+        function closeRecordModal() { document.getElementById("record-modal").classList.add("hidden"); }
+
+        // 智慧組數列繪製 (已將 .count 全部修正為標準的 .length)
+        function renderModalSetsRows() {
+            const container = document.getElementById("sets-input-container"); container.innerHTML = "";
+            modalSets.forEach((set, index) => {
+                let weightDisplay = set.weight === null ? "N/A" : `${set.weight}`; let isMins = set.metricType === "mins";
+                let rowHtml = `
+                    <div class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                        <span class="text-xs font-black text-gray-400 w-6">#${set.setNumber}</span>
+                        <button onclick="toggleSetSide(${index})" class="w-6 h-6 rounded-full text-[10px] font-black text-white flex items-center justify-center ${set.side==='L'?'bg-blue-500':set.side==='R'?'bg-red-500':'bg-gray-300'}">
+                            ${set.side || '雙'}
+                        </button>
+                        <div class="flex items-center bg-white rounded-lg px-2 py-1 border flex-1 justify-between">
+                            <span class="text-[10px] text-gray-400 mr-1">重量</span>
+                            <span onclick="toggleWeightNA(${index})" class="font-mono font-bold text-sm text-blue-600 cursor-pointer px-2 bg-gray-100 rounded">${weightDisplay}</span>
+                            ${set.weight !== null ? `<input type="number" step="0.25" value="${set.weight}" onchange="updateSetWeight(${index}, this.value)" class="w-12 text-right font-mono text-xs p-0 border-0 focus:ring-0">` : ''}
+                            <button onclick="toggleSetUnit(${index})" class="text-[9px] font-black px-1.5 py-0.5 rounded text-white ${set.unit==='kg'?'bg-blue-500':'bg-orange-500'}">${set.unit.toUpperCase()}</button>
+                        </div>
+                        <div class="flex items-center bg-white rounded-lg px-2 py-1 border flex-1 justify-between">
+                            <span class="text-[10px] text-gray-400 mr-1">${isMins?'時間':'次數'}</span>
+                            <input type="number" value="${set.reps}" onchange="updateSetReps(${index}, this.value)" class="w-10 text-center font-bold text-sm p-0 border-0 focus:ring-0">
+                            <span class="text-xs text-gray-400">${isMins?'分':'下'}</span>
+                            <button onclick="toggleSetMetric(${index})" class="text-[9px] font-black px-1.5 py-0.5 rounded text-white ${isMins?'bg-purple-500':'bg-green-500'}">${isMins?'MIN':'REP'}</button>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', rowHtml);
+            });
+        }
+
+        function addNewSetRow() {
+            let last = modalSets[modalSets.length - 1] || { weight: 10, reps: 10, unit: "kg", metricType: "reps", side: null };
+            modalSets.push({ setNumber: modalSets.length + 1, weight: last.weight, reps: last.reps, unit: last.unit, metricType: last.metricType, side: last.side });
+            renderModalSetsRows();
+        }
+
+        function toggleSetSide(index) { if(!modalSets[index].side) modalSets[index].side = "L"; else if(modalSets[index].side === "L") modalSets[index].side = "R"; else modalSets[index].side = null; renderModalSetsRows(); }
+        function toggleWeightNA(index) { modalSets[index].weight = modalSets[index].weight === null ? 10 : null; renderModalSetsRows(); }
+        function updateSetWeight(index, val) { modalSets[index].weight = parseFloat(val) || 0; }
+        function updateSetReps(index, val) { modalSets[index].reps = parseInt(val) || 0; }
+        function toggleSetUnit(index) { modalSets[index].unit = modalSets[index].unit === "kg" ? "lbs" : "kg"; renderModalSetsRows(); }
+        function toggleSetMetric(index) { modalSets[index].metricType = modalSets[index].metricType === "mins" ? "reps" : "mins"; renderModalSetsRows(); }
+
+        async function saveRecordFromModal() {
+            const date = document.getElementById("record-date").value; const videoFile = document.getElementById("record-video-input").files[0]; let videoId = null;
+            if (videoFile && !useLocalStorageFallback) { videoId = "vid_" + Date.now(); await saveToStore("videos", { id: videoId, data: videoFile }); }
+            const newRecord = { id: "rec_" + Date.now(), date: date, workoutName: state.currentDetailItem.name, sets: modalSets, videoId: videoId };
+            await saveToStore("historyRecords", newRecord); state.historyRecords.unshift(newRecord);
+            closeRecordModal(); openDetailPage(state.currentDetailItem.id); renderGlobalHistory();
+        }
+
+        // --- 6. 影片播放 ---
+        async function playVideo(vidId, e) {
+            e.stopPropagation(); let vidObj = await getFromStore("videos", vidId);
+            if(vidObj) {
+                const overlay = document.getElementById("video-player-overlay"); const player = document.getElementById("global-video-player");
+                player.src = URL.createObjectURL(vidObj.data); overlay.classList.remove("hidden"); player.play();
+            } else { alert("未找到影片檔案"); }
+        }
+        function closeFullScreenVideo() { document.getElementById("video-player-overlay").classList.add("hidden"); document.getElementById("global-video-player").pause(); }
+
+        // --- 7. 全域邏輯 ---
+        function renderGlobalHistory() {
+            const container = document.getElementById("history-logs-container"); container.innerHTML = "";
+            const sorted = [...state.historyRecords].sort((a,b) => new Date(b.date) - new Date(a.date));
+            if(sorted.length === 0) { container.innerHTML = `<p class="text-xs text-gray-400 italic text-center py-6">目前沒有任何訓練紀錄</p>`; return; }
+            sorted.forEach(rec => {
+                let txt = ""; rec.sets.forEach(s => { let w = s.weight === null ? "N/A" : `${s.weight} ${s.unit}`; txt += `[#${s.setNumber} ${s.side||'雙'}] ${w} × ${s.reps}${s.metricType==='mins'?'分':'下'} | `; });
+                let html = `
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 text-xs shadow-2xs">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-black text-gray-800">${rec.workoutName}</span> <span class="text-gray-400">${rec.date}</span>
+                        </div>
+                        <p class="text-gray-500 font-mono">${txt}</p>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        async function deleteRecord(recId, e) {
+            e.stopPropagation(); if(!confirm("確定要刪除此筆紀錄嗎？")) return;
+            const rec = state.historyRecords.find(r => r.id === recId);
+            if(rec && rec.videoId && !useLocalStorageFallback) await deleteFromStore("videos", rec.videoId);
+            await deleteFromStore("historyRecords", recId); state.historyRecords = state.historyRecords.filter(r => r.id !== recId);
+            openDetailPage(state.currentDetailItem.id); renderGlobalHistory();
+        }
+
+        function openAddModal() { document.getElementById("add-item-modal").classList.remove("hidden"); document.getElementById("new-item-cat").innerHTML = state.categories.map(c => `<option value="${c}">${c}</option>`).join(''); }
+        function closeAddModal() { document.getElementById("add-item-modal").classList.add("hidden"); }
+        async function submitNewItem() {
+            const name = document.getElementById("new-item-name").value.trim(); const cat = document.getElementById("new-item-cat").value; if(!name) return;
+            const newItem = { id: "item_" + Date.now(), name: name, category: cat }; await saveToStore("workoutItems", newItem); state.workoutItems.push(newItem);
+            closeAddModal(); document.getElementById("new-item-name").value = ""; renderCategoryList();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden")); document.getElementById(`tab-${tab}`).classList.remove("hidden");
+            document.querySelectorAll("nav button").forEach(btn => btn.className = "flex flex-col items-center gap-0.5 text-gray-400"); document.getElementById(`tab-btn-${tab}`).className = "flex flex-col items-center gap-0.5 text-blue-600";
+            const titles = { workout: "🏋️ GymRec 開始訓練", history: "📈 GymRec 歷史總覽", settings: "⚙️ GymRec 系統設定" };
+            document.getElementById("page-title").innerText = titles[tab]; document.getElementById("global-add-btn").style.display = tab === "workout" ? "block" : "none";
+        }
+
+        async function resetDatabase() {
+            if(!confirm("確定要清除所有健身數據與分類嗎？此操作不可逆！")) return;
+            if(!useLocalStorageFallback) { await clearStore("workoutItems"); await clearStore("historyRecords"); await clearStore("videos"); await clearStore("categories"); }
+            localStorage.clear(); location.reload();
+        }
+
+        // --- 8. 智慧雙核 API 封裝 (安全攔截並轉發錯誤) ---
+        function getAllFromStore(storeName) {
+            if (useLocalStorageFallback) return Promise.resolve(JSON.parse(localStorage.getItem(storeName)) || []);
+            return new Promise((res, rej) => {
+                try {
+                    let tx = db.transaction(storeName, "readonly"); let store = tx.objectStore(storeName); let req = store.getAll();
+                    req.onsuccess = () => res(req.result || []); req.onerror = () => rej(req.error);
+                } catch(e) { activateFallbackMode(); res([]); }
+            });
+        }
+        function saveToStore(storeName, obj) {
+            if (useLocalStorageFallback) { return getAllFromStore(storeName).then(list => { list = list.filter(i => i.id !== obj.id); list.push(obj); localStorage.setItem(storeName, JSON.stringify(list)); }); }
+            return new Promise((res) => {
+                try {
+                    let tx = db.transaction(storeName, "readwrite"); let store = tx.objectStore(storeName); store.put(obj); tx.oncomplete = () => res();
+                } catch(e) { activateFallbackMode(); res(); }
+            });
+        }
+        function addToStore(storeName, obj) {
+            if (useLocalStorageFallback) { return getAllFromStore(storeName).then(list => { list.push(obj); localStorage.setItem(storeName, JSON.stringify(list)); }); }
+            return new Promise((res) => {
+                try {
+                    let tx = db.transaction(storeName, "readwrite"); let store = tx.objectStore(storeName); store.add(obj); tx.oncomplete = () => res();
+                } catch(e) { activateFallbackMode(); res(); }
+            });
+        }
+        function getFromStore(storeName, id) {
+            if (useLocalStorageFallback) { return getAllFromStore(storeName).then(list => list.find(i => i.id === id)); }
+            return new Promise((res) => {
+                try {
+                    let tx = db.transaction(storeName, "readonly"); let store = tx.objectStore(storeName); let req = store.get(id); req.onsuccess = () => res(req.result);
+                } catch(e) { activateFallbackMode(); res(null); }
+            });
+        }
+        function deleteFromStore(storeName, id) {
+            if (useLocalStorageFallback) { return getAllFromStore(storeName).then(list => { list = list.filter(i => i.id !== id); localStorage.setItem(storeName, JSON.stringify(list)); }); }
+            return new Promise((res) => {
+                try {
+                    let tx = db.transaction(storeName, "readwrite"); let store = tx.objectStore(storeName); store.delete(id); tx.oncomplete = () => res();
+                } catch(e) { activateFallbackMode(); res(); }
+            });
+        }
+        function clearStore(storeName) {
+            if (useLocalStorageFallback) { localStorage.removeItem(storeName); return Promise.resolve(); }
+            return new Promise((res) => {
+                try {
+                    let tx = db.transaction(storeName, "readwrite"); let store = tx.objectStore(storeName); store.clear(); tx.oncomplete = () => res();
+                } catch(e) { activateFallbackMode(); res(); }
+            });
+        }
+    </script>
+</body>
+</html>
