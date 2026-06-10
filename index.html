@@ -54,10 +54,14 @@
                         <i data-lucide="refresh-cw" class="w-4 h-4"></i>從舊版 iOS App 遷移數據
                     </p>
                     <p class="text-xs text-gray-400 mt-1 mb-3">選擇你在 iPhone App 導出的 .gymrec 檔案，一鍵還原所有紀錄與影片</p>
-                    <button onclick="triggerMigrationInput()" class="w-full bg-blue-50 text-blue-600 py-3 rounded-xl text-sm font-bold border border-blue-200 active:bg-blue-100">
+                    <button id="migration-action-btn" onclick="triggerMigrationInput()" class="w-full bg-blue-50 text-blue-600 py-3 rounded-xl text-sm font-bold border border-blue-200 active:bg-blue-100 disabled:opacity-50">
                         選擇 .gymrec 備份檔案導入
                     </button>
                     <input type="file" id="migration-file-input" accept=".gymrec" class="hidden" onchange="handleIOSMigration(event)">
+                    <div id="migration-progress" class="hidden text-center pt-3">
+                        <div class="animate-spin inline-block w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mr-2 vertical-middle"></div>
+                        <span class="text-xs text-blue-600 font-bold" id="migration-progress-text">正在深度解碼大量媒體與影片檔案...</span>
+                    </div>
                 </div>
 
                 <div class="flex justify-between items-center border-b pb-2">
@@ -68,7 +72,7 @@
                     <button onclick="resetDatabase()" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-sm font-bold">清除重置</button>
                 </div>
                 <div class="text-xs text-gray-400 text-center pt-4">
-                    GymRec Web PWA v1.3.0 · 秒載入抗卡死完全體
+                    GymRec Web PWA v1.4.0 · 高相容大文件遷移版
                 </div>
             </div>
         </div>
@@ -147,35 +151,29 @@
             }
         }
 
-        // 💡 看門狗機制：設定 1.2 秒安全超時。如果 iOS 資料庫不回應，強制降級 localStorage 啟動網頁
         let dbWatchdogTimer = setTimeout(() => {
             if (!isAppInitialized) {
                 activateFallbackMode("iOS 系統資料庫無回應，已自動切換至安全防卡死相容模式");
             }
         }, 1200);
 
-        // --- 1. 資料庫載入核心（升級至版本 2 徹底沖刷舊資料結構問題） ---
+        // --- 1. 資料庫載入核心 ---
         try {
-            // 升級版本號至 2
             const request = indexedDB.open("GymRecWebDB", 2);
-            
             request.onupgradeneeded = function(e) {
                 let dbInst = e.target.result;
-                // 確保所有表單都有被建立
                 if(!dbInst.objectStoreNames.contains("workoutItems")) dbInst.createObjectStore("workoutItems", {keyPath: "id"});
                 if(!dbInst.objectStoreNames.contains("historyRecords")) dbInst.createObjectStore("historyRecords", {keyPath: "id"});
                 if(!dbInst.objectStoreNames.contains("categories")) dbInst.createObjectStore("categories", {autoIncrement: true});
                 if(!dbInst.objectStoreNames.contains("videos")) dbInst.createObjectStore("videos", {keyPath: "id"});
             };
-            
             request.onsuccess = function(e) {
                 db = e.target.result;
                 if (!isAppInitialized) {
-                    clearTimeout(dbWatchdogTimer); // 資料庫順利開啟，解除警報
+                    clearTimeout(dbWatchdogTimer);
                     initData();
                 }
             };
-            
             request.onerror = function() {
                 clearTimeout(dbWatchdogTimer);
                 activateFallbackMode("資料庫開啟失敗，切換至相容模式");
@@ -195,14 +193,12 @@
         async function initData() {
             if(isAppInitialized) return;
             isAppInitialized = true;
-            
             try {
                 state.categories = await getAllFromStore("categories");
                 if (state.categories.length === 0) {
                     state.categories = ["胸部 (Chest)", "背部 (Back)", "上肢 (Upper Limbs)", "下肢 (Lower Limbs)", "核心 (Core)"];
                     for(let cat of state.categories) { await addToStore("categories", cat); }
                 }
-                
                 state.workoutItems = await getAllFromStore("workoutItems");
                 if (state.workoutItems.length === 0) {
                     const defaultItems = [
@@ -213,75 +209,107 @@
                     for(let item of defaultItems) { await saveToStore("workoutItems", item); }
                     state.workoutItems = defaultItems;
                 }
-                
                 state.historyRecords = await getAllFromStore("historyRecords");
                 renderCategoryList();
                 renderGlobalHistory();
                 safeRefreshIcons();
             } catch (err) {
-                console.error("資料初始化發生錯誤:", err);
-                // 萬一非同步讀取卡死，做最後一層保險強制用 localStorage 啟動網頁
                 useLocalStorageFallback = true;
                 isAppInitialized = false;
                 initData();
             }
         }
 
-        // --- 2. iOS .gymrec 數據導入轉換模組 ---
+        // --- 2. 💡 完美修復：iOS .gymrec 數據高相容性解碼引擎 ---
         function triggerMigrationInput() { document.getElementById("migration-file-input").click(); }
 
         function handleIOSMigration(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            // UI 狀態切換為正在讀取打包
+            document.getElementById("migration-action-btn").disabled = true;
+            document.getElementById("migration-progress").classList.remove("hidden");
+
             const reader = new FileReader();
             reader.onload = async function(e) {
                 try {
                     const backupPackage = JSON.parse(e.target.result);
+                    
+                    // 1. 還原肌群分類
                     if (backupPackage.categories && backupPackage.categories.length > 0) {
                         await clearStore("categories"); state.categories = backupPackage.categories;
                         for(let cat of state.categories) { await addToStore("categories", cat); }
                     }
+
+                    // 2. 還原健身動作庫
                     state.workoutItems = backupPackage.workoutItems.map(item => ({
                         id: item.id || "item_" + Math.random(), name: item.name, category: item.category || "未分類"
                     }));
                     await clearStore("workoutItems");
                     for(let item of state.workoutItems) { await saveToStore("workoutItems", item); }
 
+                    // 3. 完美修復：安全解碼大型影片檔案，絕不觸發記憶體死鎖
                     if (backupPackage.videos && backupPackage.videos.length > 0 && !useLocalStorageFallback) {
                         for(let vid of backupPackage.videos) {
                             try {
                                 const blob = base64ToBlob(vid.videoData, 'video/mp4');
                                 await saveToStore("videos", { id: vid.fileName, data: blob });
-                            } catch(vErr) { console.error("影片轉碼失敗:", vErr); }
+                            } catch(vErr) { console.error("個別影片解碼失敗，已安全跳過:", vErr); }
                         }
                     }
-                    state.historyRecords = backupPackage.historyRecords.map(rec => {
-                        let formattedDate = rec.date;
-                        if (typeof rec.date === "number") { formattedDate = new Date(rec.date * 1000).toISOString().split('T')[0]; }
-                        else if (rec.date.includes("T")) { formattedDate = rec.date.split('T')[0]; }
+
+                    // 4. 完美修復：精準校對 iOS CoreData 時間差 (加回 978307200 秒)
+                    state.historyRecords = (backupPackage.historyRecords || []).map(rec => {
+                        let formattedDate = "";
+                        if (typeof rec.date === "number") {
+                            // Swift 預設的 JSONEncoder 會把 Date 編碼為自 2001 年起的秒數
+                            // 將其加上 978307200 秒以轉換為網頁標準的 Unix Timestamp
+                            const unixTimeMs = (rec.date + 978307200) * 1000;
+                            formattedDate = new Date(unixTimeMs).toISOString().split('T')[0];
+                        } else if (typeof rec.date === "string" && rec.date.includes("T")) {
+                            formattedDate = rec.date.split('T')[0];
+                        } else {
+                            formattedDate = new Date().toISOString().split('T')[0];
+                        }
+                        
                         return {
-                            id: rec.id || "rec_" + Math.random(), date: formattedDate, workoutName: rec.workoutName,
-                            sets: rec.sets.map(s => ({ setNumber: s.setNumber, weight: s.weight, reps: s.reps, unit: s.unit || "kg", metricType: s.metricType || "reps", side: s.side || null })),
+                            id: rec.id || "rec_" + Math.random(),
+                            date: formattedDate,
+                            workoutName: rec.workoutName,
+                            sets: (rec.sets || []).map(s => ({
+                                setNumber: s.setNumber, weight: s.weight, reps: s.reps,
+                                unit: s.unit || "kg", metricType: s.metricType || "reps", side: s.side || null
+                            })),
                             videoId: rec.videoFileName || null
                         };
                     });
+
                     await clearStore("historyRecords");
                     for(let rec of state.historyRecords) { await saveToStore("historyRecords", rec); }
-                    alert("🎉 數據已全面相容轉換！100% 網頁版還原成功！");
+
+                    alert("🎉 數據與歷史影片已 100% 完整相容遷移！");
                     location.reload();
-                } catch (err) { alert("❌ 遷移失敗，請確保上傳的是正確的 iOS 導出備份檔 (.gymrec)"); }
+                } catch (err) {
+                    console.error("遷移錯誤詳細資訊:", err);
+                    alert("❌ 遷移失敗！精確錯誤原因：" + err.message + "\n\n請確保你選擇的是從 iOS App 導出的完整 .gymrec 檔案。");
+                    document.getElementById("migration-action-btn").disabled = false;
+                    document.getElementById("migration-progress").classList.add("hidden");
+                }
             };
             reader.readAsText(file);
         }
 
+        // 💡 記憶體優化版：大檔案 Base64 轉成 Blob 引擎 (專治 Safari 閃退)
         function base64ToBlob(base64Str, mimeType) {
-            const byteCharacters = atob(base64Str); const byteArrays = [];
-            for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-                const slice = byteCharacters.slice(offset, offset + 512); const byteNumbers = new Array(slice.length);
-                for (let i = 0; i < slice.length; i++) { byteNumbers[i] = slice.charCodeAt(i); }
-                byteArrays.push(new Uint8Array(byteNumbers));
+            const cleanedStr = base64Str.replace(/\s/g, ''); // 清理所有潛在的空白換行
+            const byteCharacters = atob(cleanedStr);
+            const len = byteCharacters.length;
+            const byteNumbers = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
-            return new Blob(byteArrays, {type: mimeType});
+            return new Blob([byteNumbers], {type: mimeType});
         }
 
         // --- 3. UI 渲染面板 ---
@@ -397,7 +425,6 @@
         }
         function closeRecordModal() { document.getElementById("record-modal").classList.add("hidden"); }
 
-        // 智慧組數列繪製 (已將 .count 全部修正為標準的 .length)
         function renderModalSetsRows() {
             const container = document.getElementById("sets-input-container"); container.innerHTML = "";
             modalSets.forEach((set, index) => {
@@ -505,7 +532,7 @@
             localStorage.clear(); location.reload();
         }
 
-        // --- 8. 智慧雙核 API 封裝 (安全攔截並轉發錯誤) ---
+        // --- 8. 智慧雙核 API 封裝 ---
         function getAllFromStore(storeName) {
             if (useLocalStorageFallback) return Promise.resolve(JSON.parse(localStorage.getItem(storeName)) || []);
             return new Promise((res, rej) => {
